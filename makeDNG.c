@@ -78,7 +78,7 @@ static TIFFExtendProc parent_extender = NULL;  // In case we want a chain of ext
 
 static void registerCustomTIFFTags( TIFF *tif )
 {
-    /* Install the extended Tag field info */
+    // Install the extended Tag field info
     int error = TIFFMergeFieldInfo( tif, xtiffFieldInfo, sizeof( xtiffFieldInfo ) / sizeof( xtiffFieldInfo[0] ) );
 
     if( parent_extender )
@@ -99,34 +99,27 @@ int main( int argc, char **argv )
     int status = 1;
     if( argc < 3 ) goto fail;
 
-    static const float_t balance[] = { 1.0, 1.0, 1.0 }; // not using any camera gain
+    // White balance gains calculated with dcamprof
+    static const float_t balance_unity[] = { 1.00f, 1.00f, 1.00f };
+    static const float_t balance_D50[]   = { 1.57f, 1.00f, 1.51f };
+    static const float_t balance_D55[]   = { 1.67f, 1.00f, 1.40f };
+    static const float_t balance_D65[]   = { 1.82f, 1.00f, 1.25f };
+    static const float_t balance_StdA[]  = { 1.00f, 1.00f, 2.53f };
+
     static const uint16_t cfa_dimensions[] = { 2, 2 };
     static const float_t lensinfo[] = { 35.0f, 35.0f, 2.8f, 2.8f };
     static const double_t exposure_time[] = { 1.0f, 5.0f };
     static const double_t f_number = 4.0;
     static const uint16_t isospeed[] = { 100 };
+    static const float_t *balance = balance_D50;
 
-    // I'm working with Ektachrome film, so dcamprof was patched to add Ektaspace primaries and then used to derive the matrices below
+    // I'm working with Ektachrome film, so dcamprof was patched to add Ektaspace primaries and then used to derive the matrices below.
     // The spectral sensitivity chart in the Point Grey data sheet was used instead of actual ColorChecker test shots since that
     // seemed to produce better results. YMMV. You can always assign a .dcp file with RawTherapee later if you want to override this.
 
-    // Ektaspace
     static const float_t cm1[] = { 1.299046f, -0.514857f, -0.123131f, -0.130278f, 1.028754f,  0.117381f, -0.053247f,  0.190644f, 0.633399f };
     static const float_t fm1[] = { 0.516209f,  0.387509f,  0.060500f,  0.059270f, 1.054966f, -0.114236f,  0.028743f, -0.288736f, 1.085194f };
-
-    // Ektaspace dual (StdA, D65)
-    // static const float_t cm1[] = { 1.653300f, -0.863900f, -0.100000f, -0.038600f, 0.902700f,  0.163000f, -0.001600f,  0.122400f, 0.679300f };
-    // static const float_t cm2[] = { 1.197700f, -0.432800f, -0.127300f, -0.150800f, 1.051500f,  0.113800f, -0.066300f,  0.213800f, 0.621800f };
-    // static const float_t fm1[] = { 0.533600f,  0.324300f,  0.106400f, -0.022900f, 1.072500f, -0.049500f,  0.020400f, -0.390900f, 1.195500f };
-    // static const float_t fm2[] = { 0.513200f,  0.420400f,  0.030700f,  0.084300f, 1.062400f, -0.146700f,  0.025300f, -0.244200f, 1.044100f };
-
-    // sRGB
-    // static const float_t cm1[] = { 1.262754f, -0.489137f, -0.111894f, -0.172647f, 1.051837f,  0.138915f, -0.130211f,  0.297795f, 0.593481f };
-    // static const float_t fm1[] = { 0.534702f,  0.395518f,  0.033998f,  0.067625f, 1.064278f, -0.131903f,  0.061814f, -0.420885f, 1.184272f };
-
-    // Munsell colors
-    // static const float_t cm1[] = { 1.371415f, -0.637680f, -0.058966f, -0.113604f, 0.962723f,  0.177957f, -0.083913f,  0.211040f, 0.644405f };
-    // static const float_t fm1[] = { 0.511201f,  0.426254f,  0.026764f,  0.062997f, 1.064999f, -0.127995f,  0.057267f, -0.362485f, 1.130420f };
+    static const int illuminant = 23; // StdA=17, D50=23, D55=20, D65=21
 
     uint32_t width = 0, height = 0, bpp = 0, spp = 0, rps = 0;
     uint64_t exif_dir_offset = 0;
@@ -203,7 +196,7 @@ int main( int argc, char **argv )
     TIFFSetField( tif, TIFFTAG_ANALOGBALANCE, 3, balance );
     TIFFSetField( tif, TIFFTAG_CAMERASERIALNUMBER, "15187959" );
     TIFFSetField( tif, TIFFTAG_LENSINFO, lensinfo );
-    TIFFSetField( tif, TIFFTAG_CALIBRATIONILLUMINANT1, 23 ); // StdA=17, D65=21, D50=23
+    TIFFSetField( tif, TIFFTAG_CALIBRATIONILLUMINANT1, illuminant );
     // TIFFSetField( tif, TIFFTAG_CALIBRATIONILLUMINANT1, 17 );
     // TIFFSetField( tif, TIFFTAG_CALIBRATIONILLUMINANT2, 21 );
     TIFFSetField( tif, TIFFTAG_RAWDATAUNIQUEID, uuid );

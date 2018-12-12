@@ -41,7 +41,6 @@
 
 #include "prng.h"
 
-#define EXIFTAG_LENSMAKE 42035
 #define TIFFTAG_FORWARDMATRIX1 50964
 #define TIFFTAG_FORWARDMATRIX2 50965
 
@@ -69,7 +68,6 @@ static const char cfa_patterns[4][CFA_NUM_PATTERNS] = {
 };
 
 static const TIFFFieldInfo xtiffFieldInfo[] = {
-    { EXIFTAG_LENSMAKE, -1, -1, TIFF_ASCII, FIELD_CUSTOM, 1, 1, "LensMake" },
     { TIFFTAG_FORWARDMATRIX1, -1, -1, TIFF_SRATIONAL, FIELD_CUSTOM, 1, 1, "ForwardMatrix1" },
     { TIFFTAG_FORWARDMATRIX2, -1, -1, TIFF_SRATIONAL, FIELD_CUSTOM, 1, 1, "ForwardMatrix2" }
 };
@@ -106,8 +104,9 @@ int main( int argc, char **argv )
     static const float_t balance_D65[]   = { 1.82f, 1.00f, 1.25f };
     static const float_t balance_StdA[]  = { 1.00f, 1.00f, 2.53f };
 
+    static const float_t as_shot_d50[] = { 0.636099f, 1.0f ,0.661984f };
+
     static const uint16_t cfa_dimensions[] = { 2, 2 };
-    static const float_t lensinfo[] = { 35.0f, 35.0f, 2.8f, 2.8f };
     static const double_t exposure_time[] = { 1.0f, 5.0f };
     static const double_t f_number = 4.0;
     static const uint16_t isospeed[] = { 100 };
@@ -194,8 +193,8 @@ int main( int argc, char **argv )
     TIFFSetField( tif, TIFFTAG_COLORMATRIX1, 9, cm1 );
     // TIFFSetField( tif, TIFFTAG_COLORMATRIX2, 9, cm2 );
     TIFFSetField( tif, TIFFTAG_ANALOGBALANCE, 3, balance );
+    TIFFSetField( tif, TIFFTAG_ASSHOTNEUTRAL, 3, as_shot_d50 );
     TIFFSetField( tif, TIFFTAG_CAMERASERIALNUMBER, "15187959" );
-    TIFFSetField( tif, TIFFTAG_LENSINFO, lensinfo );
     TIFFSetField( tif, TIFFTAG_CALIBRATIONILLUMINANT1, illuminant );
     // TIFFSetField( tif, TIFFTAG_CALIBRATIONILLUMINANT1, 17 );
     // TIFFSetField( tif, TIFFTAG_CALIBRATIONILLUMINANT2, 21 );
@@ -223,8 +222,14 @@ int main( int argc, char **argv )
     TIFFSetField( tif, EXIFTAG_SHUTTERSPEEDVALUE, log2( exposure_time[0] / exposure_time[1] ) * -1 );
     TIFFSetField( tif, EXIFTAG_APERTUREVALUE, log2( f_number * f_number ) );
     TIFFSetField( tif, EXIFTAG_FLASH, 32 ); // no flash function
+    TIFFSetField( tif, EXIFTAG_SENSINGMETHOD, 2 );
     TIFFSetField( tif, EXIFTAG_IMAGEUNIQUEID, uuid_str );
+#ifdef HAVE_CUSTOM_EXIFTAGS
+    TIFFSetField( tif, EXIFTAG_TIFFEPSTANDARDID, "\01\00\00\00" );
     TIFFSetField( tif, EXIFTAG_LENSMAKE, "Canon" );
+    TIFFSetField( tif, EXIFTAG_LENSMODEL, "Macrophoto 35mm f/2.8" );
+    TIFFSetField( tif, EXIFTAG_LENSSERIALNUMBER, "13718" );
+#endif
     TIFFWriteCustomDirectory( tif, &exif_dir_offset );
     TIFFSetDirectory( tif, 0 );
     TIFFSetField( tif, TIFFTAG_EXIFIFD, exif_dir_offset );

@@ -93,7 +93,7 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;HAVE_CUSTOM_EXIFTAGS</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\libtiff\libtiff;..\..\libtiff\build-win32\libtiff</AdditionalIncludeDirectories>
       <CompileAs>CompileAsC</CompileAs>
     </ClCompile>
@@ -110,7 +110,7 @@
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>..\..\libtiff\libtiff;..\..\libtiff\build-win64\libtiff</AdditionalIncludeDirectories>
       <CompileAs>CompileAsC</CompileAs>
-      <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;HAVE_CUSTOM_EXIFTAGS</PreprocessorDefinitions>
       <FloatingPointModel>Precise</FloatingPointModel>
     </ClCompile>
     <Link>
@@ -127,7 +127,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;HAVE_CUSTOM_EXIFTAGS</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\libtiff\libtiff;..\..\libtiff\build-win32\libtiff</AdditionalIncludeDirectories>
       <CompileAs>CompileAsC</CompileAs>
     </ClCompile>
@@ -148,7 +148,7 @@
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>..\..\libtiff\libtiff;..\..\libtiff\build-win64\libtiff</AdditionalIncludeDirectories>
       <CompileAs>CompileAsC</CompileAs>
-      <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;HAVE_CUSTOM_EXIFTAGS</PreprocessorDefinitions>
       <FloatingPointModel>Precise</FloatingPointModel>
       <OmitFramePointers>true</OmitFramePointers>
     </ClCompile>

@@ -161,10 +161,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\lj92.c" />
     <ClCompile Include="..\makeDNG.c" />
     <ClCompile Include="..\prng.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\lj92.h" />
     <ClInclude Include="..\prng.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

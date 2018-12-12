@@ -14,6 +14,8 @@
  *     http://sipi.usc.edu/database/tiff2raw.c
  * rawtiDNG by Kevin Lawson:
  *     https://github.com/kelvinlawson/rawti-tools
+ * Lossless JPEG (T.81 Annex H) by Andrew Baldwin:
+ *     https://bitbucket.org/baldand/mlrawviewer
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -40,6 +42,7 @@
 #include <tiffio.h>
 
 #include "prng.h"
+#include "lj92.h"
 
 #define TIFFTAG_FORWARDMATRIX1 50964
 #define TIFFTAG_FORWARDMATRIX2 50965
@@ -167,26 +170,33 @@ int main( int argc, char **argv )
     snprintf( datetime, sizeof( datetime ), "%04d:%02d:%02d %02d:%02d:%02d",
         tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec );
 
-    TIFFSetField( tif, TIFFTAG_DNGVERSION, "\001\002\00\00" );
-    TIFFSetField( tif, TIFFTAG_DNGBACKWARDVERSION, "\001\0\0\0" );
+    const uint32_t halfwidth = width / 2;
+    if( halfwidth % 16 || height % 16 )
+    {
+        fprintf( stderr, "Tile dimensions must be a multiple of 16.\n" );
+        goto fail;
+    }
+    TIFFSetField( tif, TIFFTAG_DNGVERSION, "\01\02\00\00" );
+    TIFFSetField( tif, TIFFTAG_DNGBACKWARDVERSION, "\01\02\00\00" );
     TIFFSetField( tif, TIFFTAG_SUBFILETYPE, 0 );
     TIFFSetField( tif, TIFFTAG_IMAGEWIDTH, width );
     TIFFSetField( tif, TIFFTAG_IMAGELENGTH, height );
     TIFFSetField( tif, TIFFTAG_BITSPERSAMPLE, bpp );
-    TIFFSetField( tif, TIFFTAG_COMPRESSION, COMPRESSION_NONE );
+    TIFFSetField( tif, TIFFTAG_COMPRESSION, COMPRESSION_JPEG );
     TIFFSetField( tif, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_CFA );
     TIFFSetField( tif, TIFFTAG_FILLORDER, FILLORDER_MSB2LSB );
-    TIFFSetField( tif, TIFFTAG_MAKE, "Point Grey" );
+    TIFFSetField( tif, TIFFTAG_MAKE, "Canon" ); // hack to enable LJ92 mode in RawTherapee
     TIFFSetField( tif, TIFFTAG_MODEL, "BF-U3-23S6C-C" );
     TIFFSetField( tif, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT );
     TIFFSetField( tif, TIFFTAG_SAMPLESPERPIXEL, spp );
-    TIFFSetField( tif, TIFFTAG_ROWSPERSTRIP, rps );
     TIFFSetField( tif, TIFFTAG_XRESOLUTION, roundf( 7250 ) );
     TIFFSetField( tif, TIFFTAG_YRESOLUTION, roundf( 7250 ) );
     TIFFSetField( tif, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG );
     TIFFSetField( tif, TIFFTAG_RESOLUTIONUNIT, RESUNIT_INCH );
-    TIFFSetField( tif, TIFFTAG_SOFTWARE, "makeDNG 0.1" );
+    TIFFSetField( tif, TIFFTAG_SOFTWARE, "makeDNG 0.2" );
     TIFFSetField( tif, TIFFTAG_DATETIME, datetime );
+    TIFFSetField( tif, TIFFTAG_TILEWIDTH, halfwidth );
+    TIFFSetField( tif, TIFFTAG_TILELENGTH, height );
     TIFFSetField( tif, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_UINT );
     TIFFSetField( tif, TIFFTAG_CFAREPEATPATTERNDIM, cfa_dimensions );
     TIFFSetField( tif, TIFFTAG_CFAPATTERN, cfa_patterns[cfa] );
@@ -205,13 +215,25 @@ int main( int argc, char **argv )
     TIFFSetField( tif, TIFFTAG_FORWARDMATRIX1, 9, fm1 );
     // TIFFSetField( tif, TIFFTAG_FORWARDMATRIX2, 9, fm2 );
 
-    uint32_t* buf = 0;
-    buf = _TIFFmalloc( TIFFScanlineSize( tif_in ) );
+    uint16_t* buf = 0;
+    buf = _TIFFmalloc( TIFFScanlineSize( tif_in ) * height );
+    uint16_t* position = buf;
     for( uint32_t row = 0; row < height; row++ )
     {
-        TIFFReadScanline( tif_in, buf, row, 0 );
-        TIFFWriteScanline( tif, buf, row, 0 );
+        TIFFReadScanline( tif_in, position, row, 0 );
+        position += width;
     }
+
+    int ret = 0;
+    unsigned const char* input = buf;
+    uint8_t* encoded = NULL;
+    int encodedLength = 0;
+    ret = lj92_encode( (uint16_t*)&input[0],     halfwidth, height, 16, halfwidth, halfwidth, NULL, 0, &encoded, &encodedLength );
+    TIFFWriteRawTile( tif, 0, encoded, encodedLength );
+    free( encoded );
+    ret = lj92_encode( (uint16_t*)&input[width], halfwidth, height, 16, halfwidth, halfwidth, NULL, 0, &encoded, &encodedLength );
+    TIFFWriteRawTile( tif, 1, encoded, encodedLength );
+    free( encoded );
 
     TIFFWriteDirectory( tif );
     TIFFCreateEXIFDirectory( tif );

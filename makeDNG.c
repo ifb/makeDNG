@@ -77,7 +77,7 @@ static TIFFExtendProc parent_extender = NULL;  // In case we want a chain of ext
 static void registerCustomTIFFTags( TIFF *tif )
 {
     // Install the extended Tag field info
-    int error = TIFFMergeFieldInfo( tif, xtiffFieldInfo, sizeof( xtiffFieldInfo ) / sizeof( xtiffFieldInfo[0] ) );
+    TIFFMergeFieldInfo( tif, xtiffFieldInfo, sizeof( xtiffFieldInfo ) / sizeof( xtiffFieldInfo[0] ) );
 
     if( parent_extender )
         (*parent_extender)(tif);
@@ -95,7 +95,7 @@ static void augment_libtiff_with_custom_tags( void )
 int main( int argc, char **argv )
 {
     int status = 1;
-    if( argc < 3 ) goto fail;
+    if( argc < 3 ) goto usage;
 
     // White balance gains calculated with dcamprof
     static const float_t balance_unity[] = { 1.00f, 1.00f, 1.00f };
@@ -141,14 +141,17 @@ int main( int argc, char **argv )
     augment_libtiff_with_custom_tags();
     TIFF *tif = 0, *tif_in = 0;
 
-    if( !(tif_in = TIFFOpen( argv[1], "r" )) )
+    if( (tif_in = TIFFOpen( argv[1], "r" )) == NULL )
     {
         perror( argv[1] );
-        return 1;
+        goto fail;
     }
 
-    if( !(tif = TIFFOpen( argv[2], "w" )) )
+    if( (tif = TIFFOpen( argv[2], "w" )) == NULL )
+    {
+        perror( argv[1] );
         goto fail;
+    }
 
     TIFFGetField( tif_in, TIFFTAG_IMAGEWIDTH, &width );
     TIFFGetField( tif_in, TIFFTAG_IMAGELENGTH, &height );
@@ -239,11 +242,13 @@ int main( int argc, char **argv )
     TIFFClose( tif );
     status = 0;
     return status;
-fail:
+usage:
     printf( "usage: makeDNG input_tiff_file output_dng_file [cfa_pattern]\n\n" );
     printf( "       cfa_pattern 0: BGGR\n" );
     printf( "                   1: GBRG\n" );
     printf( "                   2: GRBG\n" );
     printf( "                   3: RGGB (default)\n" );
+    return status;
+fail:
     return status;
 }

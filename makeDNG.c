@@ -129,6 +129,14 @@ int main( int argc, char **argv )
     int cfa = CFA_RGGB;
     if( argc > 3 ) // runtime-specified CFA pattern (useful if the image is flipped/rotated)
         cfa = atoi( argv[3] );
+    if( cfa > 3 || cfa < 0 )
+        goto usage;
+
+    int compression = COMPRESSION_NONE;
+    if( argc > 4 )
+        compression = atoi( argv[4] );
+    if( compression != COMPRESSION_NONE && compression != COMPRESSION_JPEG )
+        goto usage;
 
     uint8_t uuid[16] = { 0 };
     char uuid_str[33] = { 0 };
@@ -182,7 +190,7 @@ int main( int argc, char **argv )
     TIFFSetField( tif, TIFFTAG_IMAGEWIDTH, width );
     TIFFSetField( tif, TIFFTAG_IMAGELENGTH, height );
     TIFFSetField( tif, TIFFTAG_BITSPERSAMPLE, bpp );
-    TIFFSetField( tif, TIFFTAG_COMPRESSION, COMPRESSION_JPEG );
+    TIFFSetField( tif, TIFFTAG_COMPRESSION, compression );
     TIFFSetField( tif, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_CFA );
     TIFFSetField( tif, TIFFTAG_FILLORDER, FILLORDER_MSB2LSB );
     TIFFSetField( tif, TIFFTAG_MAKE, "Canon" ); // hack to enable LJ92 mode in RawTherapee
@@ -195,8 +203,13 @@ int main( int argc, char **argv )
     TIFFSetField( tif, TIFFTAG_RESOLUTIONUNIT, RESUNIT_INCH );
     TIFFSetField( tif, TIFFTAG_SOFTWARE, "makeDNG 0.2" );
     TIFFSetField( tif, TIFFTAG_DATETIME, datetime );
-    TIFFSetField( tif, TIFFTAG_TILEWIDTH, halfwidth );
-    TIFFSetField( tif, TIFFTAG_TILELENGTH, height );
+    if( compression == COMPRESSION_JPEG )
+    {
+        TIFFSetField( tif, TIFFTAG_TILEWIDTH, halfwidth );
+        TIFFSetField( tif, TIFFTAG_TILELENGTH, height );
+    }
+    else
+        TIFFSetField( tif, TIFFTAG_ROWSPERSTRIP, rps );
     TIFFSetField( tif, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_UINT );
     TIFFSetField( tif, TIFFTAG_CFAREPEATPATTERNDIM, cfa_dimensions );
     TIFFSetField( tif, TIFFTAG_CFAPATTERN, cfa_patterns[cfa] );
@@ -215,25 +228,30 @@ int main( int argc, char **argv )
     TIFFSetField( tif, TIFFTAG_FORWARDMATRIX1, 9, fm1 );
     // TIFFSetField( tif, TIFFTAG_FORWARDMATRIX2, 9, fm2 );
 
-    uint16_t* buf = 0;
+    uint8_t* buf = 0;
     buf = _TIFFmalloc( TIFFScanlineSize( tif_in ) * height );
-    uint16_t* position = buf;
-    for( uint32_t row = 0; row < height; row++ )
+    uint8_t* position = buf;
+    for( unsigned int row = 0; row < height; row++ )
     {
         TIFFReadScanline( tif_in, position, row, 0 );
-        position += width;
+        if( compression == COMPRESSION_NONE )
+            TIFFWriteScanline( tif, position, row, 0 );
+        position += width * 2;
     }
 
-    int ret = 0;
-    unsigned const char* input = buf;
-    uint8_t* encoded = NULL;
-    int encodedLength = 0;
-    ret = lj92_encode( (uint16_t*)&input[0],     halfwidth, height, 16, halfwidth, halfwidth, NULL, 0, &encoded, &encodedLength );
-    TIFFWriteRawTile( tif, 0, encoded, encodedLength );
-    free( encoded );
-    ret = lj92_encode( (uint16_t*)&input[width], halfwidth, height, 16, halfwidth, halfwidth, NULL, 0, &encoded, &encodedLength );
-    TIFFWriteRawTile( tif, 1, encoded, encodedLength );
-    free( encoded );
+    if( compression == COMPRESSION_JPEG )
+    {
+        int ret = 0;
+        uint8_t* input = buf;
+        uint8_t* encoded = NULL;
+        int encodedLength = 0;
+        ret = lj92_encode( (uint16_t*)&input[0], halfwidth, height, 16, halfwidth, halfwidth, NULL, 0, &encoded, &encodedLength );
+        TIFFWriteRawTile( tif, 0, encoded, encodedLength );
+        free( encoded );
+        ret = lj92_encode( (uint16_t*)&input[width], halfwidth, height, 16, halfwidth, halfwidth, NULL, 0, &encoded, &encodedLength );
+        TIFFWriteRawTile( tif, 1, encoded, encodedLength );
+        free( encoded );
+    }
 
     TIFFWriteDirectory( tif );
     TIFFCreateEXIFDirectory( tif );
@@ -265,11 +283,13 @@ int main( int argc, char **argv )
     status = 0;
     return status;
 usage:
-    printf( "usage: makeDNG input_tiff_file output_dng_file [cfa_pattern]\n\n" );
+    printf( "usage: makeDNG input_tiff_file output_dng_file [cfa_pattern] [compression]\n\n" );
     printf( "       cfa_pattern 0: BGGR\n" );
     printf( "                   1: GBRG\n" );
     printf( "                   2: GRBG\n" );
-    printf( "                   3: RGGB (default)\n" );
+    printf( "                   3: RGGB (default)\n\n" );
+    printf( "       compression 1: none (default)\n" );
+    printf( "                   7: lossless JPEG\n" );
     return status;
 fail:
     return status;

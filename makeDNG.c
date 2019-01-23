@@ -102,18 +102,25 @@ int main( int argc, char **argv )
 
     // White balance gains calculated with dcamprof
     static const float_t balance_unity[] = { 1.00f, 1.00f, 1.00f };
-    static const float_t balance_D50[]   = { 1.57f, 1.00f, 1.51f };
-    static const float_t balance_D55[]   = { 1.67f, 1.00f, 1.40f };
-    static const float_t balance_D65[]   = { 1.82f, 1.00f, 1.25f };
-    static const float_t balance_StdA[]  = { 1.00f, 1.00f, 2.53f };
+    static const float_t balance_D50[] = { 1.57f, 1.00f, 1.51f };
+    static const float_t balance_D55[] = { 1.67f, 1.00f, 1.40f };
+    static const float_t balance_D65[] = { 1.82f, 1.00f, 1.25f };
+    static const float_t balance_D75[] = { 1.93f, 1.00f, 1.15f };
+    static const float_t balance_StdA[] = { 1.00f, 1.00f, 2.53f };
 
-    static const float_t as_shot_d50[] = { 0.636099f, 1.0f ,0.661984f };
+    static const float_t as_shot_D50[] = { 0.636099f, 1.0f, 0.661984f };
+    static const float_t as_shot_D55[] = { 0.599260f, 1.0f, 0.713991f };
+    static const float_t as_shot_D65[] = { 0.549323f, 1.0f, 0.802144f };
+    static const float_t as_shot_D75[] = { 0.518043f, 1.0f, 0.872091f };
+    static const float_t as_shot_StdA[] = { 0.998233f, 1.0f, 0.394600f };
 
     static const uint16_t cfa_dimensions[] = { 2, 2 };
     static const double_t exposure_time[] = { 1.0f, 5.0f };
     static const double_t f_number = 4.0;
     static const uint16_t isospeed[] = { 100 };
-    static const float_t *balance = balance_D50;
+    static const float_t *balance = balance_unity;
+    static const float_t *as_shot = as_shot_D55;
+    static const float_t resolution = 7300.0f;
 
     // I'm working with Ektachrome film, so dcamprof was patched to add Ektaspace primaries and then used to derive the matrices below.
     // The spectral sensitivity chart in the Point Grey data sheet was used instead of actual ColorChecker test shots since that
@@ -121,7 +128,7 @@ int main( int argc, char **argv )
 
     static const float_t cm1[] = { 1.299046f, -0.514857f, -0.123131f, -0.130278f, 1.028754f,  0.117381f, -0.053247f,  0.190644f, 0.633399f };
     static const float_t fm1[] = { 0.516209f,  0.387509f,  0.060500f,  0.059270f, 1.054966f, -0.114236f,  0.028743f, -0.288736f, 1.085194f };
-    static const int illuminant = 23; // StdA=17, D50=23, D55=20, D65=21
+    static const int illuminant1 = 23; // StdA=17, D50=23, D55=20, D65=21
 
     uint32_t width = 0, height = 0, bpp = 0, spp = 0, rps = 0;
     uint64_t exif_dir_offset = 0;
@@ -138,6 +145,8 @@ int main( int argc, char **argv )
     if( compression != COMPRESSION_NONE && compression != COMPRESSION_JPEG )
         goto usage;
 
+    const uint8_t version2[] = "\01\02\00\00";
+    uint8_t* version = version2;
     uint8_t uuid[16] = { 0 };
     char uuid_str[33] = { 0 };
     prng_get_bytes( uuid, sizeof( uuid ) );
@@ -184,8 +193,9 @@ int main( int argc, char **argv )
         fprintf( stderr, "Tile dimensions must be a multiple of 16.\n" );
         goto fail;
     }
-    TIFFSetField( tif, TIFFTAG_DNGVERSION, "\01\02\00\00" );
-    TIFFSetField( tif, TIFFTAG_DNGBACKWARDVERSION, "\01\02\00\00" );
+
+    TIFFSetField( tif, TIFFTAG_DNGVERSION, version );
+    TIFFSetField( tif, TIFFTAG_DNGBACKWARDVERSION, version );
     TIFFSetField( tif, TIFFTAG_SUBFILETYPE, 0 );
     TIFFSetField( tif, TIFFTAG_IMAGEWIDTH, width );
     TIFFSetField( tif, TIFFTAG_IMAGELENGTH, height );
@@ -194,11 +204,11 @@ int main( int argc, char **argv )
     TIFFSetField( tif, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_CFA );
     TIFFSetField( tif, TIFFTAG_FILLORDER, FILLORDER_MSB2LSB );
     TIFFSetField( tif, TIFFTAG_MAKE, "Canon" ); // hack to enable LJ92 mode in RawTherapee
-    TIFFSetField( tif, TIFFTAG_MODEL, "BF-U3-23S6C-C" );
+    TIFFSetField( tif, TIFFTAG_MODEL, "BFLY-U3-23S6C-C" );
     TIFFSetField( tif, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT );
     TIFFSetField( tif, TIFFTAG_SAMPLESPERPIXEL, spp );
-    TIFFSetField( tif, TIFFTAG_XRESOLUTION, roundf( 7250 ) );
-    TIFFSetField( tif, TIFFTAG_YRESOLUTION, roundf( 7250 ) );
+    TIFFSetField( tif, TIFFTAG_XRESOLUTION, resolution );
+    TIFFSetField( tif, TIFFTAG_YRESOLUTION, resolution );
     TIFFSetField( tif, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG );
     TIFFSetField( tif, TIFFTAG_RESOLUTIONUNIT, RESUNIT_INCH );
     TIFFSetField( tif, TIFFTAG_SOFTWARE, "makeDNG 0.2" );
@@ -219,11 +229,10 @@ int main( int argc, char **argv )
     TIFFSetField( tif, TIFFTAG_COLORMATRIX1, 9, cm1 );
     // TIFFSetField( tif, TIFFTAG_COLORMATRIX2, 9, cm2 );
     TIFFSetField( tif, TIFFTAG_ANALOGBALANCE, 3, balance );
-    TIFFSetField( tif, TIFFTAG_ASSHOTNEUTRAL, 3, as_shot_d50 );
+    TIFFSetField( tif, TIFFTAG_ASSHOTNEUTRAL, 3, as_shot );
     TIFFSetField( tif, TIFFTAG_CAMERASERIALNUMBER, "15187959" );
-    TIFFSetField( tif, TIFFTAG_CALIBRATIONILLUMINANT1, illuminant );
-    // TIFFSetField( tif, TIFFTAG_CALIBRATIONILLUMINANT1, 17 );
-    // TIFFSetField( tif, TIFFTAG_CALIBRATIONILLUMINANT2, 21 );
+    TIFFSetField( tif, TIFFTAG_CALIBRATIONILLUMINANT1, illuminant1 );
+    // TIFFSetField( tif, TIFFTAG_CALIBRATIONILLUMINANT2, illuminant2 );
     TIFFSetField( tif, TIFFTAG_RAWDATAUNIQUEID, uuid );
     TIFFSetField( tif, TIFFTAG_FORWARDMATRIX1, 9, fm1 );
     // TIFFSetField( tif, TIFFTAG_FORWARDMATRIX2, 9, fm2 );

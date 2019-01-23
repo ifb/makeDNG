@@ -16,6 +16,7 @@ cfa_pattern can be from 0-3
 compression
   * 1 none (default)
   * 7 lossless JPEG
+  * 8 Adobe Deflate (16-bit float)
 
 Adobe Camera Raw sometimes decodes lossless JPEG files incorrectly, so this is
 why lossless JPEG is not the default. Both RawTherapee 5.5 and ffmpeg decode
@@ -44,8 +45,8 @@ TODO:
 
  * Use threads to compress each tile
  * Add support for non-mod16 tile sizes (use padding)
- * Convert to float16 and compress with zlib (DNG 1.4)
  * Create proper CinemaDNG sequences
+ * Implement the floating point X2 predictor (34894)
 
 References:
 

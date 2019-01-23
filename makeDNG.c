@@ -43,6 +43,7 @@
 
 #include "prng.h"
 #include "lj92.h"
+#include "dng_utils.h"
 
 #define TIFFTAG_FORWARDMATRIX1 50964
 #define TIFFTAG_FORWARDMATRIX2 50965
@@ -142,11 +143,20 @@ int main( int argc, char **argv )
     int compression = COMPRESSION_NONE;
     if( argc > 4 )
         compression = atoi( argv[4] );
-    if( compression != COMPRESSION_NONE && compression != COMPRESSION_JPEG )
+    if( compression != COMPRESSION_NONE && compression != COMPRESSION_JPEG &&
+        compression != COMPRESSION_ADOBE_DEFLATE )
         goto usage;
 
+    const uint8_t version4[] = "\01\04\00\00";
     const uint8_t version2[] = "\01\02\00\00";
     uint8_t* version = version2;
+    int sampleformat = SAMPLEFORMAT_UINT;
+    if( compression == COMPRESSION_ADOBE_DEFLATE )
+    {
+        version = version4;
+        sampleformat = SAMPLEFORMAT_IEEEFP;
+    }
+
     uint8_t uuid[16] = { 0 };
     char uuid_str[33] = { 0 };
     prng_get_bytes( uuid, sizeof( uuid ) );
@@ -203,7 +213,7 @@ int main( int argc, char **argv )
     TIFFSetField( tif, TIFFTAG_COMPRESSION, compression );
     TIFFSetField( tif, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_CFA );
     TIFFSetField( tif, TIFFTAG_FILLORDER, FILLORDER_MSB2LSB );
-    TIFFSetField( tif, TIFFTAG_MAKE, "Canon" ); // hack to enable LJ92 mode in RawTherapee
+    TIFFSetField( tif, TIFFTAG_MAKE, compression == COMPRESSION_JPEG ? "Canon" : "Point Gray" ); // hack to enable LJ92 mode in RawTherapee
     TIFFSetField( tif, TIFFTAG_MODEL, "BFLY-U3-23S6C-C" );
     TIFFSetField( tif, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT );
     TIFFSetField( tif, TIFFTAG_SAMPLESPERPIXEL, spp );
@@ -211,16 +221,9 @@ int main( int argc, char **argv )
     TIFFSetField( tif, TIFFTAG_YRESOLUTION, resolution );
     TIFFSetField( tif, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG );
     TIFFSetField( tif, TIFFTAG_RESOLUTIONUNIT, RESUNIT_INCH );
-    TIFFSetField( tif, TIFFTAG_SOFTWARE, "makeDNG 0.2" );
+    TIFFSetField( tif, TIFFTAG_SOFTWARE, "makeDNG 0.3" );
     TIFFSetField( tif, TIFFTAG_DATETIME, datetime );
-    if( compression == COMPRESSION_JPEG )
-    {
-        TIFFSetField( tif, TIFFTAG_TILEWIDTH, halfwidth );
-        TIFFSetField( tif, TIFFTAG_TILELENGTH, height );
-    }
-    else
-        TIFFSetField( tif, TIFFTAG_ROWSPERSTRIP, rps );
-    TIFFSetField( tif, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_UINT );
+    TIFFSetField( tif, TIFFTAG_SAMPLEFORMAT, sampleformat );
     TIFFSetField( tif, TIFFTAG_CFAREPEATPATTERNDIM, cfa_dimensions );
     TIFFSetField( tif, TIFFTAG_CFAPATTERN, cfa_patterns[cfa] );
     TIFFSetField( tif, TIFFTAG_UNIQUECAMERAMODEL, "Point Grey Blackfly U3-23S6C-C" );
@@ -239,17 +242,42 @@ int main( int argc, char **argv )
 
     uint8_t* buf = 0;
     buf = _TIFFmalloc( TIFFScanlineSize( tif_in ) * height );
-    uint8_t* position = buf;
-    for( unsigned int row = 0; row < height; row++ )
-    {
-        TIFFReadScanline( tif_in, position, row, 0 );
-        if( compression == COMPRESSION_NONE )
-            TIFFWriteScanline( tif, position, row, 0 );
-        position += width * 2;
-    }
 
-    if( compression == COMPRESSION_JPEG )
+    for( uint32_t row = 0; row < height; row++ )
+        TIFFReadScanline( tif_in, &buf[row * width * 2], row, 0 );
+
+    if( compression == COMPRESSION_NONE )
     {
+        TIFFSetField( tif, TIFFTAG_ROWSPERSTRIP, rps );
+        for( uint32_t row = 0; row < height; row++ )
+            TIFFWriteScanline( tif, &buf[row * width * 2], row, 0 );
+    }
+    else if( compression == COMPRESSION_ADOBE_DEFLATE )
+    {
+        TIFFSetField( tif, TIFFTAG_TILEWIDTH, halfwidth );
+        TIFFSetField( tif, TIFFTAG_TILELENGTH, height );
+        TIFFSetField( tif, TIFFTAG_ZIPQUALITY, 9 );
+        TIFFSetField( tif, TIFFTAG_PREDICTOR, PREDICTOR_FLOATINGPOINT );
+        uint16_t* buf1 = _TIFFmalloc( TIFFScanlineSize( tif_in ) * height / 2 );
+        uint16_t* buf2 = _TIFFmalloc( TIFFScanlineSize( tif_in ) * height / 2 );
+        const float_t scale = 1.0f / 65535.0f;
+        uint16_t* buf16 = (uint16_t*)buf;
+        for( uint32_t row = 0; row < height; row++ )
+        {
+            for( uint32_t i = 0; i < halfwidth; i++ )
+                buf1[row * halfwidth + i] = DNG_FloatToHalf( float_bits( buf16[row * width + i] * scale ) );
+            for( uint32_t i = halfwidth; i < width; i++ )
+                buf2[row * halfwidth + i - halfwidth] = DNG_FloatToHalf( float_bits( buf16[row * width + i] * scale ) );
+        }
+        TIFFWriteTile( tif, buf1, 0, 0, 0, sizeof( buf1 ) );
+        TIFFWriteTile( tif, buf2, halfwidth, 0, 0, sizeof( buf2 ) );
+        _TIFFfree( buf1 );
+        _TIFFfree( buf2 );
+    }
+    else if( compression == COMPRESSION_JPEG )
+    {
+        TIFFSetField( tif, TIFFTAG_TILEWIDTH, halfwidth );
+        TIFFSetField( tif, TIFFTAG_TILELENGTH, height );
         int ret = 0;
         uint8_t* input = buf;
         uint8_t* encoded = NULL;
@@ -299,6 +327,7 @@ usage:
     printf( "                   3: RGGB (default)\n\n" );
     printf( "       compression 1: none (default)\n" );
     printf( "                   7: lossless JPEG\n" );
+    printf( "                   8: Adobe Deflate (16-bit float)\n" );
     return status;
 fail:
     return status;

@@ -117,8 +117,8 @@ int main( int argc, char **argv )
 
     static const uint16_t cfa_dimensions[] = { 2, 2 };
     static const double_t exposure_time[] = { 1.0f, 5.0f };
-    static const double_t f_number = 4.0;
-    static const uint16_t isospeed[] = { 100 };
+    static const double_t f_number = 2.5f;
+    static const uint16_t isospeed[] = { 90 };
     static const float_t *balance = balance_unity;
     static const float_t *as_shot = as_shot_D55;
     static const float_t resolution = 7300.0f;
@@ -292,7 +292,7 @@ int main( int argc, char **argv )
 
     TIFFWriteDirectory( tif );
     TIFFCreateEXIFDirectory( tif );
-    TIFFSetField( tif, EXIFTAG_FOCALLENGTH, 81.0f );
+    TIFFSetField( tif, EXIFTAG_FOCALLENGTH, 107.0f );
     TIFFSetField( tif, EXIFTAG_EXPOSURETIME, exposure_time[0] / exposure_time[1] );
     TIFFSetField( tif, EXIFTAG_FNUMBER, f_number );
     TIFFSetField( tif, EXIFTAG_ISOSPEEDRATINGS, 1, isospeed );
@@ -306,9 +306,9 @@ int main( int argc, char **argv )
     TIFFSetField( tif, EXIFTAG_IMAGEUNIQUEID, uuid_str );
 #ifdef HAVE_CUSTOM_EXIFTAGS
     TIFFSetField( tif, EXIFTAG_TIFFEPSTANDARDID, "\01\00\00\00" );
-    TIFFSetField( tif, EXIFTAG_LENSMAKE, "Canon" );
-    TIFFSetField( tif, EXIFTAG_LENSMODEL, "Macrophoto 35mm f/2.8" );
-    TIFFSetField( tif, EXIFTAG_LENSSERIALNUMBER, "13718" );
+    TIFFSetField( tif, EXIFTAG_LENSMAKE, "Minolta" );
+    TIFFSetField( tif, EXIFTAG_LENSMODEL, "M5400 36mm f/2.5" );
+    TIFFSetField( tif, EXIFTAG_LENSSERIALNUMBER, "20401326" );
 #endif
     TIFFWriteCustomDirectory( tif, &exif_dir_offset );
     TIFFSetDirectory( tif, 0 );

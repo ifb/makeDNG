@@ -47,6 +47,9 @@
 
 #define TIFFTAG_FORWARDMATRIX1 50964
 #define TIFFTAG_FORWARDMATRIX2 50965
+#define TIFFTAG_TIMECODES 51043
+#define TIFFTAG_FRAMERATE 51044
+#define TIFFTAG_REELNAME 51081
 
 enum tiff_cfa_color
 {
@@ -73,7 +76,10 @@ static const char cfa_patterns[4][CFA_NUM_PATTERNS] = {
 
 static const TIFFFieldInfo xtiffFieldInfo[] = {
     { TIFFTAG_FORWARDMATRIX1, -1, -1, TIFF_SRATIONAL, FIELD_CUSTOM, 1, 1, "ForwardMatrix1" },
-    { TIFFTAG_FORWARDMATRIX2, -1, -1, TIFF_SRATIONAL, FIELD_CUSTOM, 1, 1, "ForwardMatrix2" }
+    { TIFFTAG_FORWARDMATRIX2, -1, -1, TIFF_SRATIONAL, FIELD_CUSTOM, 1, 1, "ForwardMatrix2" },
+    { TIFFTAG_TIMECODES, -1, -1, TIFF_BYTE, FIELD_CUSTOM, 1, 1, "TimeCodes" },
+    { TIFFTAG_FRAMERATE, -1, -1, TIFF_SRATIONAL, FIELD_CUSTOM, 1, 1, "FrameRate" },
+    { TIFFTAG_REELNAME, -1, -1, TIFF_ASCII, FIELD_CUSTOM, 1, 0, "ReelName" }
 };
 
 static TIFFExtendProc parent_extender = NULL;  // In case we want a chain of extensions
@@ -122,6 +128,8 @@ int main( int argc, char **argv )
     static const float_t *balance = balance_unity;
     static const float_t *as_shot = as_shot_D55;
     static const float_t resolution = 7300.0f;
+    static const float_t framerate[] = { 18, 1 };
+    uint8_t timecode[8] = { 0 };
 
     // I'm working with Ektachrome film, so dcamprof was patched to add Ektaspace primaries and then used to derive the matrices below.
     // The spectral sensitivity chart in the Point Grey data sheet was used instead of actual ColorChecker test shots since that
@@ -147,9 +155,35 @@ int main( int argc, char **argv )
         compression != COMPRESSION_ADOBE_DEFLATE )
         goto usage;
 
+    int frame = 0;
+    if( argc > 6 )
+        frame = atoi( argv[6] );
+    if( frame < 0 )
+        goto usage;
+
+    if( frame )
+    {
+        // Time code is an integer cast to a hex string for our purposes
+        // There's more to it in SMPTE 12M/309/331 if you want to get into drop-frame or date/time
+        // For example, to indicate 17 frames you write 0x17 (not 0x11)
+        char buf[5];
+        timecode[3] = (int)( frame / ( 3600 * framerate[0]/framerate[1] ) );
+        sprintf( buf, "0x%d", timecode[3] );
+        timecode[3] = (int)strtol( buf, NULL, 16 );
+        timecode[2] = (int)( frame / (   60 * framerate[0]/framerate[1] ) ) % 60;
+        sprintf( buf, "0x%d", timecode[2] );
+        timecode[2] = (int)strtol( buf, NULL, 16 );
+        timecode[1] = (int)( frame / (        framerate[0]/framerate[1] ) ) % 60;
+        sprintf( buf, "0x%d", timecode[1] );
+        timecode[1] = (int)strtol( buf, NULL, 16 );
+        timecode[0] = (int)fmod( frame, framerate[0]/framerate[1] );
+        sprintf( buf, "0x%d", timecode[0] );
+        timecode[0] = (int)strtol( buf, NULL, 16 );
+    }
+
     const uint8_t version4[] = "\01\04\00\00";
     const uint8_t version2[] = "\01\02\00\00";
-    uint8_t* version = version2;
+    const uint8_t* version = version2;
     int sampleformat = SAMPLEFORMAT_UINT;
     if( compression == COMPRESSION_ADOBE_DEFLATE )
     {
@@ -213,7 +247,7 @@ int main( int argc, char **argv )
     TIFFSetField( tif, TIFFTAG_COMPRESSION, compression );
     TIFFSetField( tif, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_CFA );
     TIFFSetField( tif, TIFFTAG_FILLORDER, FILLORDER_MSB2LSB );
-    TIFFSetField( tif, TIFFTAG_MAKE, compression == COMPRESSION_JPEG ? "Canon" : "Point Gray" ); // hack to enable LJ92 mode in RawTherapee
+    TIFFSetField( tif, TIFFTAG_MAKE, compression == COMPRESSION_JPEG ? "Canon" : "Point Grey" ); // hack to enable LJ92 mode in RawTherapee
     TIFFSetField( tif, TIFFTAG_MODEL, "BFLY-U3-23S6C-C" );
     TIFFSetField( tif, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT );
     TIFFSetField( tif, TIFFTAG_SAMPLESPERPIXEL, spp );
@@ -239,6 +273,13 @@ int main( int argc, char **argv )
     TIFFSetField( tif, TIFFTAG_RAWDATAUNIQUEID, uuid );
     TIFFSetField( tif, TIFFTAG_FORWARDMATRIX1, 9, fm1 );
     // TIFFSetField( tif, TIFFTAG_FORWARDMATRIX2, 9, fm2 );
+    if( frame )
+    {
+        TIFFSetField( tif, TIFFTAG_TIMECODES, 8, timecode );
+        TIFFSetField( tif, TIFFTAG_FRAMERATE, 2, framerate );
+    }
+    if( argc > 5 )
+        TIFFSetField( tif, TIFFTAG_REELNAME, argv[5] );
 
     uint8_t* buf = 0;
     buf = _TIFFmalloc( TIFFScanlineSize( tif_in ) * height );
@@ -320,7 +361,8 @@ int main( int argc, char **argv )
     status = 0;
     return status;
 usage:
-    printf( "usage: makeDNG input_tiff_file output_dng_file [cfa_pattern] [compression]\n\n" );
+    printf( "usage: makeDNG input_tiff_file output_dng_file [cfa_pattern] [compression]\n" );
+    printf( "               [reelname] [frame number]\n\n" );
     printf( "       cfa_pattern 0: BGGR\n" );
     printf( "                   1: GBRG\n" );
     printf( "                   2: GRBG\n" );

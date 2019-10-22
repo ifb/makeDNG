@@ -289,7 +289,8 @@ int main( int argc, char **argv )
 
     if( compression == COMPRESSION_NONE )
     {
-        TIFFSetField( tif, TIFFTAG_ROWSPERSTRIP, rps );
+        if( rps )
+            TIFFSetField( tif, TIFFTAG_ROWSPERSTRIP, rps );
         for( uint32_t row = 0; row < height; row++ )
             TIFFWriteScanline( tif, &buf[row * width * 2], row, 0 );
     }

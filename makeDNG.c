@@ -259,7 +259,18 @@ int main( int argc, char **argv )
     TIFFSetField( tif, TIFFTAG_DATETIME, datetime );
     TIFFSetField( tif, TIFFTAG_SAMPLEFORMAT, sampleformat );
     TIFFSetField( tif, TIFFTAG_CFAREPEATPATTERNDIM, cfa_dimensions );
+
+#if TIFFLIB_VERSION >= 20201219
+    /*
+        The arguments for TIFFTAG_CFAPATTERN changed in tifflib 4.2.0 per
+        https://gitlab.com/libtiff/libtiff/-/issues/58
+        In newer versions we need to specify the number of elements in the pattern array.
+        The number above is TIFFLIB_VERSION in tiffvers.h v4.2.0
+    */
+    TIFFSetField( tif, TIFFTAG_CFAPATTERN, 4, cfa_patterns[cfa] );
+#else
     TIFFSetField( tif, TIFFTAG_CFAPATTERN, cfa_patterns[cfa] );
+#endif
     TIFFSetField( tif, TIFFTAG_UNIQUECAMERAMODEL, "Point Grey Blackfly U3-23S6C-C" );
     TIFFSetField( tif, TIFFTAG_CFAPLANECOLOR, 3, "\00\01\02" ); // RGB
     TIFFSetField( tif, TIFFTAG_CFALAYOUT, 1 ); // rectangular or square (not staggered)

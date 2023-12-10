@@ -1,10 +1,9 @@
-makeDNG
-===========
+# makeDNG
 
 Simple tool for converting mosaiced (Bayer) TIFF files to Adobe DNG,
 specifically suited for the Point Grey BFLY-U3-23S6C-C camera.
 
-Usage:
+# Usage:
 
     makeDNG input_tiff_file output_dng_file [cfa_pattern] [compression] [reelname] [frame number]
 cfa_pattern can be from 0-3
@@ -27,7 +26,7 @@ frame number
   The frame number should match the sequencing field of the file name. See §6.2
   of the CinemaDNG spec for details.
 
-Notes:
+# Notes:
 
 Adobe Camera Raw sometimes decodes lossless JPEG files incorrectly, so this is
 why lossless JPEG is not the default. Both RawTherapee 5.5 and ffmpeg decode
@@ -44,10 +43,11 @@ data is estimated from the graphic in the camera's data sheet, so don't put too
 much trust in it.  A trivial patch is needed to add Ektaspace primaries to
 dcamprof if that interests you.
 
-Build Instructions:
+# Build Instructions
 
- * An MSVC project is included. I haven't bothered to test on non-Windows
-   systems, but it should be fairly portable.
+## Windows build (Visual Studio 2017):
+
+ * An MSVC project is included.
  * libtiff newer than around 4.0.6 is required for some of the DNG tags.
    Even when compression is used, no optional libs (zlib/zstd/lzma/libjpeg) are
    needed. We compress each tile with LJ92 ourselves and write them with
@@ -56,13 +56,21 @@ Build Instructions:
    tags. This is very optional, but does avoid RawTherapee reporting your lens
    as "Unknown".
 
-TODO:
+## Linux build (tested on Ubuntu 20.04):
+
+In the base directory for the project, build with:
+
+```
+gcc -std=c99 -g -oO *.c -o makedng -lz -ltiff -lm
+```
+
+# TODO:
 
  * Use threads to compress each tile
  * Add support for non-mod16 tile sizes (use padding)
  * Implement the floating point X2 predictor (34894)
 
-References:
+# References:
 
 Thanks to the following for their previous work:
 

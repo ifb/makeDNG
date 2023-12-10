@@ -56,7 +56,7 @@ dcamprof if that interests you.
    tags. This is very optional, but does avoid RawTherapee reporting your lens
    as "Unknown".
 
-# Linux build (tested on Ubuntu 20.04):
+## Linux build (tested on Ubuntu 20.04):
 
 In the base directory for the project, build with:
 
